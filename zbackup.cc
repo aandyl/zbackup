@@ -393,32 +393,51 @@ invalid_option:
     else
     if ( strcmp( args[ 0 ], "inspect" ) == 0 )
     {
-      if ( args.size() < 2 || args.size() > 3 )
+      if ( args.size() < 3 || args.size() > 5 )
       {
-        fprintf( stderr, "Usage: %s %s [full] <storage path>\n",
+        fprintf( stderr, "Usage: %s %s [backup|index|bundle] [full] <storage> <path>\n",
                  *argv, args[ 0 ] );
         return EXIT_FAILURE;
       }
 
-      int fieldStorage = 1, fieldAction = 2;
-
-      if ( args.size() == 3 )
+      if ( strcmp( args[ 1 ], "backup" ) == 0 )
       {
-        fieldStorage = 2, fieldAction = 1;
-      }
+        int fieldStorage = 2, fieldAction = 3;
 
-      if ( args.size() > 2 && strcmp( args[ fieldAction ], "deep" ) == 0 )
-      {
-        ZInspect zi( ZRestore::deriveStorageDirFromBackupsFile( args[ fieldStorage ] ),
-                     passwords[ 0 ], config, true );
-        zi.inspect( args[ fieldStorage ] );
+        if ( args.size() == 4 )
+        {
+          fieldStorage = 3, fieldAction = 2;
+        }
+
+        if ( args.size() > 3 && strcmp( args[ fieldAction ], "deep" ) == 0 )
+        {
+          ZInspect zi( ZRestore::deriveStorageDirFromBackupsFile( args[ fieldStorage ] ),
+                       passwords[ 0 ], config, true );
+          zi.inspectBackup( args[ fieldStorage ] );
+        }
+        else
+        {
+          ZInspect zi( ZRestore::deriveStorageDirFromBackupsFile( args[ fieldStorage ] ),
+                       passwords[ 0 ], config, false );
+          zi.inspectBackup( args[ fieldStorage ] );
+        }
       }
       else
+      if ( strcmp( args[ 1 ], "index" ) == 0 )
       {
-        ZInspect zi( ZRestore::deriveStorageDirFromBackupsFile( args[ fieldStorage ] ),
+        ZInspect zi( args[ 2 ],
                      passwords[ 0 ], config, false );
-        zi.inspect( args[ fieldStorage ] );
+        zi.inspectIndex( args[ 3 ] );
       }
+      else
+      if ( strcmp( args[ 1 ], "bundle" ) == 0 )
+      {
+        ZInspect zi( args[ 2 ],
+                     passwords[ 0 ], config, false );
+        zi.inspectBundle( args[ 3 ] );
+      }
+      else
+        fprintf( stderr, "Unknown inspection type %s\n", args[ 1 ] );
     }
     else
     if ( strcmp( args[ 0 ], "config" ) == 0 )

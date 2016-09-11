@@ -80,12 +80,16 @@ public:
 class ZInspect : public ZBackupBase
 {
 public:
+  DEF_EX( exIncorrectChunkIdSize, "Incorrect chunk id size encountered", Ex )
+
   ZInspect( std::string const & storageDir, std::string const & password,
               Config & configIn );
   ZInspect( std::string const & storageDir, std::string const & password,
               Config & configIn, bool deep );
 
-  void inspect( string const & inputFileName );
+  void inspectBackup( string const & inputFileName );
+  void inspectIndex( string const & indexFileName );
+  void inspectBundle( string const & bundleFileName );
 };
 
 #endif

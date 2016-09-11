@@ -516,7 +516,7 @@ ZInspect::ZInspect( string const & storageDir, string const & password,
 {
 }
 
-void ZInspect::inspect( string const & inputFileName )
+void ZInspect::inspectBackup( string const & inputFileName )
 {
   BackupInfo backupInfo;
 
@@ -538,25 +538,93 @@ void ZInspect::inspect( string const & inputFileName )
   out += "\nSHA256 sum of data: ";
   out += Utils::toHex( backupInfo.sha256() );
 
+  struct Sha256Writer : public DataSink
+  {
+    Sha256 sha256;
+
+    virtual void saveData( void const * data, size_t size )
+    {
+      sha256.add( data, size );
+    }
+  } sha256Writer;
+
   // Index is loaded so mode is "deep", let's get chunk map
   if ( chunkIndex.size() )
   {
-    out += "\nBundles containing backup chunks:\n";
+    out += "\nBundles containing backup chunks:";
     ChunkStorage::Reader chunkStorageReader( config, encryptionkey, chunkIndex, getBundlesPath(),
          config.runtime.cacheSize );
     string backupData;
     BackupRestorer::restoreIterations( chunkStorageReader, backupInfo, backupData, NULL );
     BackupRestorer::ChunkMap map;
-    BackupRestorer::restore( chunkStorageReader, backupData, NULL, NULL, &map, NULL );
+    BackupRestorer::restore( chunkStorageReader, backupData, &sha256Writer, NULL, &map, NULL );
 
     for ( BackupRestorer::ChunkMap::const_iterator it = map.begin(); it != map.end(); it++ )
     {
-      out += Utils::toHex( string( (*it).first.blob, Bundle::IdSize ) );
       out += "\n";
+      out += Utils::toHex( string( (*it).first.blob, Bundle::IdSize ) );
+    }
+
+    if ( sha256Writer.sha256.finish() != backupInfo.sha256() )
+    {
+      out += "\nBackup contents DO NOT have the expected SHA256 checksum";
+    }
+    else
+    {
+      out += "\nBackup contents have the expected SHA256 checksum";
     }
   }
-  else
-    out += "\n";
+
+  out += "\n";
 
   fprintf( stderr, "%s", out.c_str() );
+}
+
+void ZInspect::inspectIndex( string const & indexFileName )
+{
+  try
+  {
+    IndexFile::Reader reader( encryptionkey, indexFileName );
+
+    BundleInfo info;
+    Bundle::Id bundleId;
+    while( reader.readNextRecord( info, bundleId ) )
+    {
+      fprintf( stderr, "Bundle %s\n", Utils::toHex( string( bundleId.blob, Bundle::IdSize ) ).c_str() );
+      fprintf( stderr, "%s", info.DebugString().c_str() );
+
+      ChunkId id;
+
+      for ( int x = info.chunk_record_size(); x--; )
+      {
+        BundleInfo_ChunkRecord const & record = info.chunk_record( x );
+
+        if ( record.id().size() != ChunkId::BlobSize )
+          throw exIncorrectChunkIdSize();
+
+        id.setFromBlob( record.id().data() );
+      }
+
+    }
+  }
+  catch( std::exception & e )
+  {
+    verbosePrintf( "error: %s\n", e.what() );
+  }
+}
+
+void ZInspect::inspectBundle( string const & bundleFileName )
+{
+  try
+  {
+    Bundle::Reader reader( bundleFileName, encryptionkey, false );
+
+    BundleInfo info = reader.getBundleInfo();
+
+    fprintf( stderr, "%s", info.DebugString().c_str() );
+  }
+  catch( std::exception & e )
+  {
+    verbosePrintf( "error: %s\n", e.what() );
+  }
 }
